@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { runTests } from './runner/test-runner.js';
 import { discoverTests } from './utils/test-discovery.js';
+import { StreamFormatter } from './utils/stream-formatter.js';
 
 async function promptForApiKey(): Promise<string> {
   const rl = readline.createInterface({
@@ -107,6 +108,8 @@ program
         }
 
         // Run tests
+        const formatter = options.stream ? new StreamFormatter() : null;
+
         const report = await runTests(folderPath, {
           apiKey: apiKey || '',
           outputFile: options.output,
@@ -118,7 +121,11 @@ program
                 if (chunk.type === 'stderr') {
                   process.stderr.write(`\x1b[31m${chunk.data}\x1b[0m`);
                 } else {
-                  process.stdout.write(chunk.data);
+                  // Parse and format the stream-json output
+                  const formatted = formatter!.processChunk(chunk.data);
+                  for (const line of formatted) {
+                    console.log(line);
+                  }
                 }
               }
             : undefined,
