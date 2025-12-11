@@ -94,4 +94,23 @@ describe('CLI', () => {
       });
     }).toThrow();
   });
+
+  it('supports --stream flag', () => {
+    const result = execSync(`node ${cliPath} --help`, { encoding: 'utf-8' });
+
+    expect(result).toContain('--stream');
+    expect(result).toContain('Stream');
+  });
+
+  it('accepts --stream flag with folder argument', () => {
+    fs.writeFileSync(path.join(tempDir, 'test.md'), '# Test');
+
+    // Should not throw when --stream is used
+    const result = execSync(`node ${cliPath} ${tempDir} --stream --dry-run`, {
+      encoding: 'utf-8',
+      env: { ...process.env, ANTHROPIC_API_KEY: 'test-key' },
+    });
+
+    expect(result).toBeDefined();
+  });
 });

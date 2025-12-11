@@ -23,4 +23,10 @@ export interface TestReport {
 export interface RunOptions {
   outputFile?: string;
   keepContainers?: boolean;
+  stream?: boolean;
+}
+
+export interface StreamChunk {
+  type: 'stdout' | 'stderr';
+  data: string;
 }

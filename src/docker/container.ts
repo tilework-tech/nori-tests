@@ -1,6 +1,7 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
+import type { StreamChunk } from '../types.js';
 
 // Get the GID of the Docker socket for proper permissions
 function getDockerSocketGid(): number {
@@ -31,6 +32,8 @@ export interface CommandResult {
   stdout: string;
   stderr: string;
 }
+
+export type { StreamChunk } from '../types.js';
 
 export class ContainerManager {
   private docker: Docker;
@@ -132,6 +135,120 @@ export class ContainerManager {
       stdout,
       stderr,
     };
+  }
+
+  async *runCommandStreaming(
+    image: string,
+    command: string[],
+    options: RunCommandOptions,
+  ): AsyncGenerator<StreamChunk, number, unknown> {
+    // Prepare mounts (binds)
+    const binds: string[] = ['/var/run/docker.sock:/var/run/docker.sock'];
+    if (options.mounts) {
+      for (const mount of options.mounts) {
+        const mode = mount.readOnly ? 'ro' : 'rw';
+        binds.push(`${mount.hostPath}:${mount.containerPath}:${mode}`);
+      }
+    }
+
+    // Prepare environment variables
+    const envArray: string[] = [];
+    if (options.env) {
+      for (const [key, value] of Object.entries(options.env)) {
+        envArray.push(`${key}=${value}`);
+      }
+    }
+
+    // Create container
+    const dockerGid = getDockerSocketGid();
+    const container = await this.docker.createContainer({
+      Image: image,
+      Cmd: command,
+      Tty: false,
+      AttachStdout: true,
+      AttachStderr: true,
+      User: `1000:${dockerGid}`,
+      WorkingDir: options.workDir,
+      Env: envArray.length > 0 ? envArray : undefined,
+      HostConfig: {
+        Binds: binds,
+        AutoRemove: false,
+      },
+      name: options.containerName,
+    });
+
+    // Attach to streams before starting
+    const stream = await container.attach({
+      stream: true,
+      stdout: true,
+      stderr: true,
+    });
+
+    // Create a queue to hold chunks as they arrive
+    const chunkQueue: StreamChunk[] = [];
+    let resolveWaiting: (() => void) | null = null;
+    let streamEnded = false;
+
+    const stdoutStream = new PassThrough();
+    const stderrStream = new PassThrough();
+
+    stdoutStream.on('data', (chunk: Buffer) => {
+      chunkQueue.push({ type: 'stdout', data: chunk.toString() });
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    });
+
+    stderrStream.on('data', (chunk: Buffer) => {
+      chunkQueue.push({ type: 'stderr', data: chunk.toString() });
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    });
+
+    // Demux the stream
+    this.docker.modem.demuxStream(stream, stdoutStream, stderrStream);
+
+    // Start container
+    await container.start();
+
+    // Wait for container to finish in the background
+    const waitPromise = container.wait().then((result) => {
+      streamEnded = true;
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+      return result;
+    });
+
+    // Yield chunks as they arrive
+    while (!streamEnded || chunkQueue.length > 0) {
+      if (chunkQueue.length > 0) {
+        yield chunkQueue.shift()!;
+      } else if (!streamEnded) {
+        // Wait for more data
+        await new Promise<void>((resolve) => {
+          resolveWaiting = resolve;
+        });
+      }
+    }
+
+    // Wait for container to finish
+    const waitResult = await waitPromise;
+
+    // Clean up container unless keepContainer is true
+    if (!options.keepContainer) {
+      try {
+        await container.remove({ force: true });
+      } catch (_e) {
+        // Ignore removal errors
+      }
+    }
+
+    return waitResult.StatusCode;
   }
 
   async pullImage(image: string): Promise<void> {
