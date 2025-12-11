@@ -38,6 +38,10 @@ program
   .option('-o, --output <file>', 'Output JSON report to file')
   .option('--keep-containers', 'Keep containers after tests for debugging')
   .option('--dry-run', 'Discover tests without running them')
+  .option(
+    '--privileged',
+    'Run containers in privileged mode (required for docker-in-docker)',
+  )
   .action(
     async (
       folder: string,
@@ -45,6 +49,7 @@ program
         output?: string;
         keepContainers?: boolean;
         dryRun?: boolean;
+        privileged?: boolean;
       },
     ) => {
       try {
@@ -110,6 +115,7 @@ program
           outputFile: options.output,
           keepContainers: options.keepContainers,
           dryRun: options.dryRun,
+          privileged: options.privileged,
         });
 
         // Print summary

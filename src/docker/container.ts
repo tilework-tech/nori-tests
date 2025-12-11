@@ -13,6 +13,7 @@ export interface RunCommandOptions {
   env?: Record<string, string>;
   keepContainer?: boolean;
   containerName?: string;
+  privileged?: boolean;
 }
 
 export interface CommandResult {
@@ -51,16 +52,20 @@ export class ContainerManager {
     }
 
     // Create container
+    // Run as node user (UID 1000) - claude-code refuses --dangerously-skip-permissions as root
     const container = await this.docker.createContainer({
       Image: image,
       Cmd: command,
       Tty: false,
       AttachStdout: true,
       AttachStderr: true,
+      User: '1000:1000',
+      WorkingDir: options.workDir,
       Env: envArray.length > 0 ? envArray : undefined,
       HostConfig: {
         Binds: binds.length > 0 ? binds : undefined,
         AutoRemove: false, // We'll remove manually after getting output
+        Privileged: options.privileged || false,
       },
       name: options.containerName,
     });

@@ -6,7 +6,7 @@ import { appendStatusInstructions } from '../utils/markdown.js';
 import { parseStatusFile } from '../utils/status-file.js';
 import { discoverTests } from '../utils/test-discovery.js';
 
-const STATUS_FILE_PATH = '/workspace/.nori-test-status.json';
+const STATUS_FILE_NAME = '.nori-test-status.json';
 const CLAUDE_CODE_IMAGE = 'node:20'; // Will be replaced with actual devcontainer
 
 export interface TestRunnerOptions extends RunOptions {
@@ -103,11 +103,14 @@ async function runSingleTest(
   // Read test markdown
   const markdown = fs.readFileSync(testFile, 'utf-8');
 
-  // Append status instructions
-  const fullPrompt = appendStatusInstructions(markdown, STATUS_FILE_PATH);
-
   // Get the working directory (where nori-tests was invoked)
   const workDir = process.cwd();
+
+  // Status file path - use absolute path based on workDir
+  const statusFilePath = path.join(workDir, STATUS_FILE_NAME);
+
+  // Append status instructions
+  const fullPrompt = appendStatusInstructions(markdown, statusFilePath);
 
   // Create temp file for the prompt
   const promptFile = path.join(workDir, '.nori-test-prompt.md');
@@ -128,7 +131,9 @@ async function runSingleTest(
       ],
       {
         workDir,
-        mounts: [{ hostPath: workDir, containerPath: '/workspace' }],
+        // Mount to same path as host to support nested Docker (DinD)
+        // When running in DinD, inner containers also mount from host Docker
+        mounts: [{ hostPath: workDir, containerPath: workDir }],
         env: {
           ANTHROPIC_API_KEY: options.apiKey,
         },
@@ -136,12 +141,11 @@ async function runSingleTest(
         containerName: options.keepContainers
           ? `nori-test-${path.basename(testFile, '.md')}-${Date.now()}`
           : undefined,
+        privileged: options.privileged,
       },
     );
 
     // Check for status file
-    const statusFilePath = path.join(workDir, '.nori-test-status.json');
-
     if (fs.existsSync(statusFilePath)) {
       const statusContent = fs.readFileSync(statusFilePath, 'utf-8');
       const status = parseStatusFile(statusContent);
