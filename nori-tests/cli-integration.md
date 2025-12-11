@@ -1,14 +1,39 @@
 # CLI Integration Test
 
-This test validates the full nori-tests CLI workflow.
+This test validates the full nori-tests CLI workflow using docker-in-docker.
+
+> **Note:** This test requires `--privileged` mode to enable docker-in-docker.
 
 ## Prerequisites
 
-Install the Docker CLI (static binary, no root required):
+### Install Docker
+
+Install Docker inside the container. This test runs in a privileged container, which allows starting a Docker daemon (docker-in-docker).
 
 ```bash
-curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-24.0.7.tgz | tar xz -C /tmp
-export PATH="/tmp/docker:$PATH"
+# Install Docker
+apt-get update && apt-get install -y docker.io
+
+# Start the Docker daemon in the background
+dockerd &
+
+# Wait for Docker daemon to be ready
+for i in {1..30}; do
+  if docker info >/dev/null 2>&1; then
+    echo "Docker daemon is ready"
+    break
+  fi
+  echo "Waiting for Docker daemon... ($i/30)"
+  sleep 1
+done
+
+# Fail explicitly if Docker did not start
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker daemon failed to start after 30 seconds"
+  exit 1
+fi
+
+# Verify Docker is working
 docker version
 ```
 

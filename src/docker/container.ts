@@ -1,16 +1,5 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
-import * as fs from 'fs';
-
-// Get the GID of the Docker socket for proper permissions
-function getDockerSocketGid(): number {
-  try {
-    const stats = fs.statSync('/var/run/docker.sock');
-    return stats.gid;
-  } catch {
-    return 1000; // Fallback to default
-  }
-}
 
 export interface MountConfig {
   hostPath: string;
@@ -24,6 +13,7 @@ export interface RunCommandOptions {
   env?: Record<string, string>;
   keepContainer?: boolean;
   containerName?: string;
+  privileged?: boolean;
 }
 
 export interface CommandResult {
@@ -45,10 +35,7 @@ export class ContainerManager {
     options: RunCommandOptions,
   ): Promise<CommandResult> {
     // Prepare mounts (binds)
-    const binds: string[] = [
-      // Mount host Docker socket so tests can use Docker if needed
-      '/var/run/docker.sock:/var/run/docker.sock',
-    ];
+    const binds: string[] = [];
     if (options.mounts) {
       for (const mount of options.mounts) {
         const mode = mount.readOnly ? 'ro' : 'rw';
@@ -65,21 +52,20 @@ export class ContainerManager {
     }
 
     // Create container
-    // Run as node user (UID 1000) with docker socket GID for socket access
-    // claude-code refuses --dangerously-skip-permissions as root
-    const dockerGid = getDockerSocketGid();
+    // Run as node user (UID 1000) - claude-code refuses --dangerously-skip-permissions as root
     const container = await this.docker.createContainer({
       Image: image,
       Cmd: command,
       Tty: false,
       AttachStdout: true,
       AttachStderr: true,
-      User: `1000:${dockerGid}`,
+      User: '1000:1000',
       WorkingDir: options.workDir,
       Env: envArray.length > 0 ? envArray : undefined,
       HostConfig: {
-        Binds: binds,
+        Binds: binds.length > 0 ? binds : undefined,
         AutoRemove: false, // We'll remove manually after getting output
+        Privileged: options.privileged || false,
       },
       name: options.containerName,
     });

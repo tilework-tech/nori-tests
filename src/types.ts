@@ -23,4 +23,5 @@ export interface TestReport {
 export interface RunOptions {
   outputFile?: string;
   keepContainers?: boolean;
+  privileged?: boolean;
 }

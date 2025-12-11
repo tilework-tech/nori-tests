@@ -72,6 +72,12 @@ describe('CLI', () => {
     expect(result).toContain('keep-containers');
   });
 
+  it('supports --privileged flag for docker-in-docker', () => {
+    const result = execSync(`node ${cliPath} --help`, { encoding: 'utf-8' });
+
+    expect(result).toContain('privileged');
+  });
+
   it('reports no tests found for empty directory', () => {
     const result = execSync(`node ${cliPath} ${tempDir} --dry-run`, {
       encoding: 'utf-8',

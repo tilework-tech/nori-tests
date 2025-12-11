@@ -141,6 +141,7 @@ async function runSingleTest(
         containerName: options.keepContainers
           ? `nori-test-${path.basename(testFile, '.md')}-${Date.now()}`
           : undefined,
+        privileged: options.privileged,
       },
     );
 
