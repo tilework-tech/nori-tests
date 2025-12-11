@@ -127,6 +127,7 @@ async function runSingleTest(
     const useStreaming = options.stream && options.onOutput;
 
     // Build command for claude-code
+    // Note: --verbose is required when using --output-format stream-json with -p
     const claudeCommand = [
       'npx',
       '@anthropic-ai/claude-code',
@@ -135,6 +136,7 @@ async function runSingleTest(
       '--dangerously-skip-permissions',
       '--output-format',
       useStreaming ? 'stream-json' : 'text',
+      ...(useStreaming ? ['--verbose'] : []),
     ];
 
     const containerOptions = {

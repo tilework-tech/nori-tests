@@ -25,7 +25,7 @@ Path: @/src
 ### Things to Know
 
 - The `StreamChunk` interface (`{ type: 'stdout' | 'stderr', data: string }`) is duplicated in both `types.ts` and `docker/container.ts` - this is intentional to keep the docker module self-contained
-- When streaming, `claude-code` is invoked with `--output-format stream-json` instead of `text`
+- When streaming, `claude-code` is invoked with `--output-format stream-json --verbose` instead of `text` (claude-code requires `--verbose` for stream-json in print mode)
 - Exit code is 0 on all tests passing, 1 if any test fails
 - Temporary files (`.nori-test-prompt.md`, `.nori-test-status.json`) are created in the working directory during test execution
 
