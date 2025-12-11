@@ -2,6 +2,16 @@
 
 This test validates the full nori-tests CLI workflow.
 
+## Prerequisites
+
+Install the Docker CLI (static binary, no root required):
+
+```bash
+curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-24.0.7.tgz | tar xz -C /tmp
+export PATH="/tmp/docker:$PATH"
+docker version
+```
+
 ## Steps
 
 ### 1. Build the package

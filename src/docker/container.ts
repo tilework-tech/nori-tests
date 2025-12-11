@@ -1,5 +1,16 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
+import * as fs from 'fs';
+
+// Get the GID of the Docker socket for proper permissions
+function getDockerSocketGid(): number {
+  try {
+    const stats = fs.statSync('/var/run/docker.sock');
+    return stats.gid;
+  } catch {
+    return 1000; // Fallback to default
+  }
+}
 
 export interface MountConfig {
   hostPath: string;
@@ -34,7 +45,10 @@ export class ContainerManager {
     options: RunCommandOptions,
   ): Promise<CommandResult> {
     // Prepare mounts (binds)
-    const binds: string[] = [];
+    const binds: string[] = [
+      // Mount host Docker socket so tests can use Docker if needed
+      '/var/run/docker.sock:/var/run/docker.sock',
+    ];
     if (options.mounts) {
       for (const mount of options.mounts) {
         const mode = mount.readOnly ? 'ro' : 'rw';
@@ -51,21 +65,21 @@ export class ContainerManager {
     }
 
     // Create container
-    // Run as root initially so we can install Docker for DinD
-    // The test-runner shell script switches to node user (uid 1000) for claude-code
-    // since claude-code refuses --dangerously-skip-permissions when running as root
+    // Run as node user (UID 1000) with docker socket GID for socket access
+    // claude-code refuses --dangerously-skip-permissions as root
+    const dockerGid = getDockerSocketGid();
     const container = await this.docker.createContainer({
       Image: image,
       Cmd: command,
       Tty: false,
       AttachStdout: true,
       AttachStderr: true,
-      WorkingDir: '/workspace',
+      User: `1000:${dockerGid}`,
+      WorkingDir: options.workDir,
       Env: envArray.length > 0 ? envArray : undefined,
       HostConfig: {
-        Binds: binds.length > 0 ? binds : undefined,
+        Binds: binds,
         AutoRemove: false, // We'll remove manually after getting output
-        Privileged: true, // Enable DinD for tests that need Docker
       },
       name: options.containerName,
     });
