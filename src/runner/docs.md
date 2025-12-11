@@ -41,7 +41,7 @@ Path: @/src/runner
 - **Status file location**: Uses absolute path `${workDir}/.nori-test-status.json` which is in the container's mounted working directory
 - **Mount path invariant**: The working directory is mounted at the same path in the container (`hostPath === containerPath`) to support nested Docker operations where inner containers also mount from host
 - **Streaming mode**: When `options.stream` is true and `onOutput` callback is provided, uses `runCommandStreaming()` and invokes callback for each chunk
-- **Output format switching**: Uses `--output-format stream-json` when streaming, `--output-format text` otherwise
+- **Output format switching**: Uses `--output-format stream-json` with `--verbose` when streaming, `--output-format text` otherwise (claude-code requires `--verbose` for `stream-json` in print mode)
 - **Dry run mode**: Returns discovered tests without executing them (used for CI verification)
 - **No status file = failure**: If the model doesn't write a status file, the test is treated as failed
 
