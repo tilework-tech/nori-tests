@@ -51,20 +51,21 @@ export class ContainerManager {
     }
 
     // Create container
-    // Run as node user (UID 1000) to avoid root - claude-code refuses
-    // --dangerously-skip-permissions when running as root
+    // Run as root initially so we can install Docker for DinD
+    // The test-runner shell script switches to node user (uid 1000) for claude-code
+    // since claude-code refuses --dangerously-skip-permissions when running as root
     const container = await this.docker.createContainer({
       Image: image,
       Cmd: command,
       Tty: false,
       AttachStdout: true,
       AttachStderr: true,
-      User: '1000:1000',
       WorkingDir: '/workspace',
       Env: envArray.length > 0 ? envArray : undefined,
       HostConfig: {
         Binds: binds.length > 0 ? binds : undefined,
         AutoRemove: false, // We'll remove manually after getting output
+        Privileged: true, // Enable DinD for tests that need Docker
       },
       name: options.containerName,
     });
