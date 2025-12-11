@@ -38,6 +38,7 @@ program
   .option('-o, --output <file>', 'Output JSON report to file')
   .option('--keep-containers', 'Keep containers after tests for debugging')
   .option('--dry-run', 'Discover tests without running them')
+  .option('--stream', 'Stream model output to terminal in real-time')
   .action(
     async (
       folder: string,
@@ -45,6 +46,7 @@ program
         output?: string;
         keepContainers?: boolean;
         dryRun?: boolean;
+        stream?: boolean;
       },
     ) => {
       try {
@@ -110,6 +112,16 @@ program
           outputFile: options.output,
           keepContainers: options.keepContainers,
           dryRun: options.dryRun,
+          stream: options.stream,
+          onOutput: options.stream
+            ? (chunk) => {
+                if (chunk.type === 'stderr') {
+                  process.stderr.write(`\x1b[31m${chunk.data}\x1b[0m`);
+                } else {
+                  process.stdout.write(chunk.data);
+                }
+              }
+            : undefined,
         });
 
         // Print summary

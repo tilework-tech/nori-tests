@@ -1,6 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { TestReport, TestResult, RunOptions } from '../types.js';
+import type {
+  TestReport,
+  TestResult,
+  RunOptions,
+  StreamChunk,
+} from '../types.js';
 import { ContainerManager } from '../docker/container.js';
 import { appendStatusInstructions } from '../utils/markdown.js';
 import { parseStatusFile } from '../utils/status-file.js';
@@ -12,6 +17,7 @@ const CLAUDE_CODE_IMAGE = 'node:20'; // Will be replaced with actual devcontaine
 export interface TestRunnerOptions extends RunOptions {
   apiKey: string;
   dryRun?: boolean;
+  onOutput?: (chunk: StreamChunk) => void;
 }
 
 export async function runTests(
@@ -117,32 +123,52 @@ async function runSingleTest(
   fs.writeFileSync(promptFile, fullPrompt);
 
   try {
-    // Run claude-code in container
-    const _result = await containerManager.runCommand(
-      CLAUDE_CODE_IMAGE,
-      [
-        'npx',
-        '@anthropic-ai/claude-code',
-        '-p',
-        fullPrompt,
-        '--dangerously-skip-permissions',
-        '--output-format',
-        'text',
-      ],
-      {
-        workDir,
-        // Mount to same path as host to support nested Docker (DinD)
-        // When running in DinD, inner containers also mount from host Docker
-        mounts: [{ hostPath: workDir, containerPath: workDir }],
-        env: {
-          ANTHROPIC_API_KEY: options.apiKey,
-        },
-        keepContainer: options.keepContainers,
-        containerName: options.keepContainers
-          ? `nori-test-${path.basename(testFile, '.md')}-${Date.now()}`
-          : undefined,
+    // Only use streaming output format when both stream and onOutput are provided
+    const useStreaming = options.stream && options.onOutput;
+
+    // Build command for claude-code
+    const claudeCommand = [
+      'npx',
+      '@anthropic-ai/claude-code',
+      '-p',
+      fullPrompt,
+      '--dangerously-skip-permissions',
+      '--output-format',
+      useStreaming ? 'stream-json' : 'text',
+    ];
+
+    const containerOptions = {
+      workDir,
+      // Mount to same path as host to support nested Docker (DinD)
+      // When running in DinD, inner containers also mount from host Docker
+      mounts: [{ hostPath: workDir, containerPath: workDir }],
+      env: {
+        ANTHROPIC_API_KEY: options.apiKey,
       },
-    );
+      keepContainer: options.keepContainers,
+      containerName: options.keepContainers
+        ? `nori-test-${path.basename(testFile, '.md')}-${Date.now()}`
+        : undefined,
+    };
+
+    // Run claude-code in container (streaming or buffered)
+    if (useStreaming) {
+      const generator = containerManager.runCommandStreaming(
+        CLAUDE_CODE_IMAGE,
+        claudeCommand,
+        containerOptions,
+      );
+
+      for await (const chunk of generator) {
+        options.onOutput!(chunk);
+      }
+    } else {
+      await containerManager.runCommand(
+        CLAUDE_CODE_IMAGE,
+        claudeCommand,
+        containerOptions,
+      );
+    }
 
     // Check for status file
     if (fs.existsSync(statusFilePath)) {

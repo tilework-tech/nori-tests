@@ -137,4 +137,60 @@ describe('ContainerManager', () => {
       await container.remove({ force: true });
     }
   });
+
+  it('streams output in real-time with runCommandStreaming', async () => {
+    const manager = new ContainerManager();
+    const chunks: Array<{ type: string; data: string }> = [];
+
+    const generator = manager.runCommandStreaming(
+      'node:20-slim',
+      [
+        'sh',
+        '-c',
+        'echo "line1"; sleep 0.1; echo "line2"; sleep 0.1; echo "line3"',
+      ],
+      {
+        workDir: tempDir,
+      },
+    );
+
+    for await (const chunk of generator) {
+      chunks.push(chunk);
+    }
+
+    // Should have received multiple chunks (output comes in real-time)
+    expect(chunks.length).toBeGreaterThan(0);
+
+    // Combined output should contain all lines
+    const allOutput = chunks.map((c) => c.data).join('');
+    expect(allOutput).toContain('line1');
+    expect(allOutput).toContain('line2');
+    expect(allOutput).toContain('line3');
+  });
+
+  it('streams stderr separately from stdout', async () => {
+    const manager = new ContainerManager();
+    const chunks: Array<{ type: string; data: string }> = [];
+
+    const generator = manager.runCommandStreaming(
+      'node:20-slim',
+      ['sh', '-c', 'echo "stdout-msg"; echo "stderr-msg" >&2'],
+      {
+        workDir: tempDir,
+      },
+    );
+
+    for await (const chunk of generator) {
+      chunks.push(chunk);
+    }
+
+    const stdoutChunks = chunks.filter((c) => c.type === 'stdout');
+    const stderrChunks = chunks.filter((c) => c.type === 'stderr');
+
+    const stdoutOutput = stdoutChunks.map((c) => c.data).join('');
+    const stderrOutput = stderrChunks.map((c) => c.data).join('');
+
+    expect(stdoutOutput).toContain('stdout-msg');
+    expect(stderrOutput).toContain('stderr-msg');
+  });
 });
