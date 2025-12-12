@@ -48,5 +48,6 @@ Path: @/src/docker
 - **Chunk queue pattern**: The streaming implementation uses a queue + resolve callback to convert push-based Node.js streams into pull-based async iteration
 - **Demux requirement**: Docker's multiplexed stream format requires `docker.modem.demuxStream()` to separate stdout from stderr
 - **Container cleanup**: Containers are removed after execution unless `keepContainer: true` is set
+- **Session file copying**: Uses `tar-stream` and `container.putArchive()` to copy session files into stopped containers. This is required because Docker's `exec` API only works on running containers, but session files must be copied before `container.start()`. File ownership is set via tar headers (uid/gid 1000) rather than chown.
 
 Created and maintained by Nori.

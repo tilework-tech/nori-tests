@@ -1,6 +1,7 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
+import * as tar from 'tar-stream';
 import type { StreamChunk } from '../types.js';
 
 // Get the GID of the Docker socket for proper permissions
@@ -44,28 +45,39 @@ export class ContainerManager {
   }
 
   /**
-   * Copy session file to container and set proper permissions
+   * Copy session file to container using tar archive.
+   * This works on stopped containers (unlike exec which requires running container).
    */
   private async copySessionFileToContainer(
     container: Docker.Container,
     sessionFilePath: string,
   ): Promise<void> {
-    // Read session file content
-    const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
+    const sessionContent = fs.readFileSync(sessionFilePath);
 
-    // Create .claude directory and write session file in one step
-    // Use sh -c to handle the full operation as user 1000
-    const writeExec = await container.exec({
-      Cmd: [
-        'sh',
-        '-c',
-        `mkdir -p /home/node/.claude && cat > /home/node/.claude/.claude.json << 'EOF'\n${sessionContent}\nEOF`,
-      ],
-      AttachStdout: true,
-      AttachStderr: true,
-      User: '1000',
-    });
-    await writeExec.start({ Detach: false });
+    const pack = tar.pack();
+
+    // Add file with nested path - putArchive creates directories automatically
+    pack.entry(
+      {
+        name: '.claude/.claude.json',
+        mode: 0o644,
+        uid: 1000,
+        gid: 1000,
+      },
+      sessionContent,
+    );
+
+    pack.finalize();
+
+    // Collect tar stream to buffer
+    const chunks: Buffer[] = [];
+    for await (const chunk of pack) {
+      chunks.push(chunk as Buffer);
+    }
+    const tarBuffer = Buffer.concat(chunks);
+
+    // putArchive works on stopped containers
+    await container.putArchive(tarBuffer, { path: '/home/node' });
   }
 
   async runCommand(

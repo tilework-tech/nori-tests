@@ -37,11 +37,13 @@
   },
   "dependencies": {
     "commander": "^14.0.2",
-    "dockerode": "^4.0.9"
+    "dockerode": "^4.0.9",
+    "tar-stream": "^3.1.7"
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.47",
     "@types/node": "^25.0.0",
+    "@types/tar-stream": "^3.1.4",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "concurrently": "^9.2.1",
