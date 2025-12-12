@@ -23,6 +23,7 @@ export interface RunCommandOptions {
   workDir: string;
   mounts?: MountConfig[];
   env?: Record<string, string>;
+  sessionFileToCopy?: string | null;
   keepContainer?: boolean;
   containerName?: string;
 }
@@ -40,6 +41,31 @@ export class ContainerManager {
 
   constructor(socketPath: string = '/var/run/docker.sock') {
     this.docker = new Docker({ socketPath });
+  }
+
+  /**
+   * Copy session file to container and set proper permissions
+   */
+  private async copySessionFileToContainer(
+    container: Docker.Container,
+    sessionFilePath: string,
+  ): Promise<void> {
+    // Read session file content
+    const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
+
+    // Create .claude directory and write session file in one step
+    // Use sh -c to handle the full operation as user 1000
+    const writeExec = await container.exec({
+      Cmd: [
+        'sh',
+        '-c',
+        `mkdir -p /home/node/.claude && cat > /home/node/.claude/.claude.json << 'EOF'\n${sessionContent}\nEOF`,
+      ],
+      AttachStdout: true,
+      AttachStderr: true,
+      User: '1000',
+    });
+    await writeExec.start({ Detach: false });
   }
 
   async runCommand(
@@ -86,6 +112,14 @@ export class ContainerManager {
       },
       name: options.containerName,
     });
+
+    // Copy session file if provided
+    if (options.sessionFileToCopy) {
+      await this.copySessionFileToContainer(
+        container,
+        options.sessionFileToCopy,
+      );
+    }
 
     // Attach to streams before starting
     const stream = await container.attach({
@@ -176,6 +210,14 @@ export class ContainerManager {
       },
       name: options.containerName,
     });
+
+    // Copy session file if provided
+    if (options.sessionFileToCopy) {
+      await this.copySessionFileToContainer(
+        container,
+        options.sessionFileToCopy,
+      );
+    }
 
     // Attach to streams before starting
     const stream = await container.attach({
