@@ -195,4 +195,53 @@ describe('ContainerManager', () => {
     expect(stdoutOutput).toContain('stdout-msg');
     expect(stderrOutput).toContain('stderr-msg');
   });
+
+  it('copies session file to container before starting', async () => {
+    const manager = new ContainerManager();
+
+    // Create a temp session file
+    const sessionContent = JSON.stringify({
+      test: 'session-data',
+      timestamp: Date.now(),
+    });
+    const sessionFile = path.join(tempDir, 'test-session.json');
+    fs.writeFileSync(sessionFile, sessionContent);
+
+    const result = await manager.runCommand(
+      'node:20-slim',
+      ['cat', '/home/node/.claude/.claude.json'],
+      {
+        workDir: tempDir,
+        sessionFileToCopy: sessionFile,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('session-data');
+  });
+
+  it('copies session file when using streaming', async () => {
+    const manager = new ContainerManager();
+
+    const sessionContent = JSON.stringify({ streaming: 'test-value' });
+    const sessionFile = path.join(tempDir, 'stream-session.json');
+    fs.writeFileSync(sessionFile, sessionContent);
+
+    const generator = manager.runCommandStreaming(
+      'node:20-slim',
+      ['cat', '/home/node/.claude/.claude.json'],
+      {
+        workDir: tempDir,
+        sessionFileToCopy: sessionFile,
+      },
+    );
+
+    const chunks: Array<{ type: string; data: string }> = [];
+    for await (const chunk of generator) {
+      chunks.push(chunk);
+    }
+
+    const allOutput = chunks.map((c) => c.data).join('');
+    expect(allOutput).toContain('test-value');
+  });
 });
