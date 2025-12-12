@@ -1,6 +1,6 @@
 {
   "name": "nori-tests",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CLI tool for running integration tests with claude-code in isolated Docker containers",
   "type": "module",
   "main": "dist/index.js",
