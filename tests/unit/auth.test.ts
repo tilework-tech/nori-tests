@@ -33,11 +33,11 @@ describe('findClaudeSessionFile', () => {
     }
   });
 
-  it('should find .claude.json in ~/.claude/ directory when it exists', () => {
-    // Create ~/.claude/.claude.json
+  it('should find .credentials.json in ~/.claude/ directory when it exists', () => {
+    // Create ~/.claude/.credentials.json
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
+    const sessionFile = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
 
     const result = findClaudeSessionFile();
@@ -51,10 +51,10 @@ describe('findClaudeSessionFile', () => {
     expect(result).toBeNull();
   });
 
-  it('should find .claude.json in current working directory when it exists', () => {
-    // Create .claude.json in current directory
+  it('should find .credentials.json in current working directory when it exists', () => {
+    // Create .credentials.json in current directory
     const cwd = process.cwd();
-    const sessionFile = path.join(cwd, '.claude.json');
+    const sessionFile = path.join(cwd, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'local' }));
 
     try {
@@ -69,15 +69,15 @@ describe('findClaudeSessionFile', () => {
     }
   });
 
-  it('should prefer ~/.claude/.claude.json over local .claude.json', () => {
+  it('should prefer ~/.claude/.credentials.json over local .credentials.json', () => {
     // Create both files
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const globalSession = path.join(claudeDir, '.claude.json');
+    const globalSession = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(globalSession, JSON.stringify({ test: 'global' }));
 
     const cwd = process.cwd();
-    const localSession = path.join(cwd, '.claude.json');
+    const localSession = path.join(cwd, '.credentials.json');
     fs.writeFileSync(localSession, JSON.stringify({ test: 'local' }));
 
     try {
@@ -138,7 +138,7 @@ describe('getAuthMethod', () => {
   it('should return session method when only session file exists', () => {
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
+    const sessionFile = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
 
     const result = getAuthMethod();
@@ -153,7 +153,7 @@ describe('getAuthMethod', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-key-12345';
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
+    const sessionFile = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
 
     const result = getAuthMethod();
@@ -168,7 +168,7 @@ describe('getAuthMethod', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-key-12345';
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
+    const sessionFile = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
 
     const result = getAuthMethod(true);
@@ -189,7 +189,7 @@ describe('getAuthMethod', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-key-12345';
     const claudeDir = path.join(tempDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
+    const sessionFile = path.join(claudeDir, '.credentials.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
 
     const result = getAuthMethod();
@@ -242,7 +242,7 @@ describe('getAuthConfig', () => {
   });
 
   it('should return session config when using session auth', () => {
-    const sessionFile = path.join(tempDir, '.claude', '.claude.json');
+    const sessionFile = path.join(tempDir, '.claude', '.credentials.json');
     const authMethod = { type: 'session' as const, sessionFile };
 
     const config = getAuthConfig(authMethod);
@@ -259,7 +259,7 @@ describe('getAuthConfig', () => {
   });
 
   it('should use session when authMethod is session', () => {
-    const sessionFile = path.join(tempDir, '.claude', '.claude.json');
+    const sessionFile = path.join(tempDir, '.claude', '.credentials.json');
     const authMethod = {
       type: 'session' as const,
       sessionFile,

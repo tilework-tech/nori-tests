@@ -13,22 +13,22 @@ export interface AuthConfig {
 }
 
 /**
- * Find the Claude session file (.claude.json) in standard locations.
- * Checks ~/.claude/.claude.json first, then ./.claude.json
- * @returns Path to session file if found, null otherwise
+ * Find the Claude credentials file (.credentials.json) in standard locations.
+ * Checks ~/.claude/.credentials.json first, then ./.credentials.json
+ * @returns Path to credentials file if found, null otherwise
  */
 export function findClaudeSessionFile(): string | null {
-  // Check global location first: ~/.claude/.claude.json
+  // Check global location first: ~/.claude/.credentials.json
   const home = os.homedir();
   if (home) {
-    const globalSession = path.join(home, '.claude', '.claude.json');
+    const globalSession = path.join(home, '.claude', '.credentials.json');
     if (fs.existsSync(globalSession)) {
       return globalSession;
     }
   }
 
-  // Check local location: ./.claude.json
-  const localSession = path.join(process.cwd(), '.claude.json');
+  // Check local location: ./.credentials.json
+  const localSession = path.join(process.cwd(), '.credentials.json');
   if (fs.existsSync(localSession)) {
     return localSession;
   }
