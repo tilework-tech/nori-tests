@@ -82,14 +82,16 @@ describe('CLI', () => {
   });
 
   it('prompts for API key if not set', () => {
-    // Remove API key from environment
-    const envWithoutKey = { ...process.env };
-    delete envWithoutKey.ANTHROPIC_API_KEY;
+    // Remove API key and session file from environment
+    const envWithoutAuth = { ...process.env };
+    delete envWithoutAuth.ANTHROPIC_API_KEY;
+    // Set HOME to a non-existent directory to prevent finding session file
+    envWithoutAuth.HOME = '/tmp/nori-no-home-' + Date.now();
 
     expect(() => {
       execSync(`node ${cliPath} ${tempDir}`, {
         encoding: 'utf-8',
-        env: envWithoutKey,
+        env: envWithoutAuth,
         timeout: 5000,
       });
     }).toThrow();
