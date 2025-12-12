@@ -10,12 +10,13 @@ import { ContainerManager } from '../docker/container.js';
 import { appendStatusInstructions } from '../utils/markdown.js';
 import { parseStatusFile } from '../utils/status-file.js';
 import { discoverTests } from '../utils/test-discovery.js';
+import { getAuthConfig, type AuthMethod } from '../utils/auth.js';
 
 const STATUS_FILE_NAME = '.nori-test-status.json';
 const CLAUDE_CODE_IMAGE = 'node:20'; // Will be replaced with actual devcontainer
 
 export interface TestRunnerOptions extends RunOptions {
-  apiKey: string;
+  authMethod: AuthMethod;
   dryRun?: boolean;
   onOutput?: (chunk: StreamChunk) => void;
 }
@@ -139,14 +140,16 @@ async function runSingleTest(
       ...(useStreaming ? ['--verbose'] : []),
     ];
 
+    // Get auth config from auth method
+    const authConfig = getAuthConfig(options.authMethod.type === 'session');
+
     const containerOptions = {
       workDir,
       // Mount to same path as host to support nested Docker (DinD)
       // When running in DinD, inner containers also mount from host Docker
       mounts: [{ hostPath: workDir, containerPath: workDir }],
-      env: {
-        ANTHROPIC_API_KEY: options.apiKey,
-      },
+      env: authConfig.env,
+      sessionFileToCopy: authConfig.sessionFileToCopy,
       keepContainer: options.keepContainers,
       containerName: options.keepContainers
         ? `nori-test-${path.basename(testFile, '.md')}-${Date.now()}`

@@ -1,6 +1,8 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as tar from 'tar-stream';
 import type { StreamChunk } from '../types.js';
 
 // Get the GID of the Docker socket for proper permissions
@@ -13,6 +15,31 @@ function getDockerSocketGid(): number {
   }
 }
 
+// Copy a file into a container using tar stream
+async function copyFileToContainer(
+  container: Docker.Container,
+  hostFilePath: string,
+  containerPath: string,
+): Promise<void> {
+  const pack = tar.pack();
+  const fileContent = fs.readFileSync(hostFilePath);
+  const fileName = path.basename(containerPath);
+
+  // Add file to tar archive
+  pack.entry(
+    { name: fileName },
+    fileContent,
+    (err: Error | null | undefined) => {
+      if (err) throw err;
+      pack.finalize();
+    },
+  );
+
+  // Put archive into container at the directory path
+  const containerDir = path.dirname(containerPath);
+  await container.putArchive(pack, { path: containerDir });
+}
+
 export interface MountConfig {
   hostPath: string;
   containerPath: string;
@@ -23,6 +50,7 @@ export interface RunCommandOptions {
   workDir: string;
   mounts?: MountConfig[];
   env?: Record<string, string>;
+  sessionFileToCopy?: string | null;
   keepContainer?: boolean;
   containerName?: string;
 }
@@ -86,6 +114,25 @@ export class ContainerManager {
       },
       name: options.containerName,
     });
+
+    // Copy session file if provided
+    if (options.sessionFileToCopy) {
+      // Create .claude directory in container first
+      const execCreate = await container.exec({
+        Cmd: ['mkdir', '-p', '/home/node/.claude'],
+        AttachStdout: true,
+        AttachStderr: true,
+        User: '1000',
+      });
+      await execCreate.start({ Detach: false });
+
+      // Copy session file to container
+      await copyFileToContainer(
+        container,
+        options.sessionFileToCopy,
+        '/home/node/.claude/.claude.json',
+      );
+    }
 
     // Attach to streams before starting
     const stream = await container.attach({
@@ -176,6 +223,25 @@ export class ContainerManager {
       },
       name: options.containerName,
     });
+
+    // Copy session file if provided
+    if (options.sessionFileToCopy) {
+      // Create .claude directory in container first
+      const execCreate = await container.exec({
+        Cmd: ['mkdir', '-p', '/home/node/.claude'],
+        AttachStdout: true,
+        AttachStderr: true,
+        User: '1000',
+      });
+      await execCreate.start({ Detach: false });
+
+      // Copy session file to container
+      await copyFileToContainer(
+        container,
+        options.sessionFileToCopy,
+        '/home/node/.claude/.claude.json',
+      );
+    }
 
     // Attach to streams before starting
     const stream = await container.attach({

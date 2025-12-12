@@ -28,8 +28,65 @@ nori-tests <folder> [options]
 - `-o, --output <file>` - Output JSON report to file
 - `--keep-containers` - Keep containers after tests for debugging
 - `--dry-run` - Discover tests without running them
+- `--stream` - Stream model output to terminal in real-time
+- `--prefer-session` - Use Claude session instead of API key when both are available
 - `-V, --version` - Output version number
 - `-h, --help` - Display help
+
+## Authentication Methods
+
+nori-tests supports two authentication methods:
+
+### 1. API Key (Default)
+
+Set the `ANTHROPIC_API_KEY` environment variable:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-api03-...
+nori-tests ./tests
+```
+
+### 2. Claude Max Subscription
+
+If you have a Claude Pro or Max plan, you can use your subscription:
+
+```bash
+# Login to Claude (one-time setup)
+npx @anthropic-ai/claude-code login
+
+# Run tests using your subscription
+nori-tests ./tests
+```
+
+### Priority
+
+By default, if both an API key and Claude session are available, the API key takes precedence to prevent unexpected billing.
+
+To prefer your Claude subscription when both are available:
+
+```bash
+nori-tests ./tests --prefer-session
+```
+
+When both authentication methods are detected and you're using the API key, nori-tests will display a warning:
+
+```
+⚠️  Warning: Both ANTHROPIC_API_KEY and Claude session found.
+   Using API key (may incur charges).
+   Use --prefer-session to use your subscription instead.
+```
+
+### Authentication Status
+
+nori-tests displays which authentication method is being used:
+
+```
+nori-tests v1.0.0
+================
+Authentication: Claude Session
+Test folder: ./tests
+Tests found: 5
+```
 
 ## How It Works
 
@@ -69,7 +126,7 @@ Or on failure:
 
 ## Environment Variables
 
-- `ANTHROPIC_API_KEY` - Required. Your Anthropic API key. Will prompt if not set.
+- `ANTHROPIC_API_KEY` - Your Anthropic API key (optional if using Claude session)
 
 ## Examples
 
@@ -91,11 +148,46 @@ nori-tests ./tests --output report.json
 nori-tests ./tests --keep-containers
 ```
 
+## Troubleshooting
+
+### Authentication Errors
+
+If you see "No authentication method available":
+
+1. Check if you have an API key: `echo $ANTHROPIC_API_KEY`
+2. Check if you're logged into Claude: `npx @anthropic-ai/claude-code whoami`
+3. If neither exists, either:
+   - Set your API key: `export ANTHROPIC_API_KEY=sk-ant-api03-...`
+   - Login to Claude: `npx @anthropic-ai/claude-code login`
+
+### "Both API key and Claude session found" Warning
+
+This warning appears when you have both authentication methods available. By default, nori-tests uses your API key to avoid confusion about which plan is being billed.
+
+To use your Claude subscription instead:
+```bash
+nori-tests ./tests --prefer-session
+```
+
+Or to always use your session, remove the API key:
+```bash
+unset ANTHROPIC_API_KEY
+```
+
+### Session Expired
+
+If tests fail with authentication errors but you have a session file, your session may have expired:
+
+```bash
+npx @anthropic-ai/claude-code logout
+npx @anthropic-ai/claude-code login
+```
+
 ## Requirements
 
 - Node.js >= 18.0.0
 - Docker running locally
-- Valid Anthropic API key
+- Valid Anthropic API key OR Claude Pro/Max subscription
 
 ## License
 

@@ -251,7 +251,9 @@ describe('getAuthConfig', () => {
   });
 
   it('should throw error when no auth is available', () => {
-    expect(() => getAuthConfig()).toThrow('No authentication method available');
+    expect(() => getAuthConfig()).toThrow(
+      'No authentication method available',
+    );
   });
 
   it('should respect preferSession flag', () => {

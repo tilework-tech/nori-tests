@@ -7,6 +7,7 @@ import * as readline from 'readline';
 import { runTests } from './runner/test-runner.js';
 import { discoverTests } from './utils/test-discovery.js';
 import { StreamFormatter } from './utils/stream-formatter.js';
+import { getAuthMethod } from './utils/auth.js';
 
 async function promptForApiKey(): Promise<string> {
   const rl = readline.createInterface({
@@ -25,10 +26,6 @@ async function promptForApiKey(): Promise<string> {
   });
 }
 
-function getApiKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY;
-}
-
 program
   .name('nori-tests')
   .description(
@@ -40,6 +37,10 @@ program
   .option('--keep-containers', 'Keep containers after tests for debugging')
   .option('--dry-run', 'Discover tests without running them')
   .option('--stream', 'Stream model output to terminal in real-time')
+  .option(
+    '--prefer-session',
+    'Use Claude session instead of API key when both are available',
+  )
   .action(
     async (
       folder: string,
@@ -48,6 +49,7 @@ program
         keepContainers?: boolean;
         dryRun?: boolean;
         stream?: boolean;
+        preferSession?: boolean;
       },
     ) => {
       try {
@@ -58,23 +60,43 @@ program
           process.exit(1);
         }
 
-        // Get API key
-        let apiKey = getApiKey();
+        // Get authentication method
+        let authMethod = getAuthMethod(options.preferSession);
 
-        if (!apiKey && !options.dryRun) {
+        // Handle no authentication in non-dry-run mode
+        if (authMethod.type === 'none' && !options.dryRun) {
           // Try to prompt for API key
           if (process.stdin.isTTY) {
-            apiKey = await promptForApiKey();
+            const apiKey = await promptForApiKey();
             if (!apiKey) {
-              console.error('Error: ANTHROPIC_API_KEY is required');
+              console.error(
+                'Error: No authentication method available. Either set ANTHROPIC_API_KEY or login with: npx @anthropic-ai/claude-code login',
+              );
               process.exit(1);
             }
+            // Create auth method from prompted key
+            authMethod = { type: 'api-key', apiKey };
           } else {
             console.error(
-              'Error: ANTHROPIC_API_KEY environment variable is not set',
+              'Error: No authentication method available. Either set ANTHROPIC_API_KEY or login with: npx @anthropic-ai/claude-code login',
             );
             process.exit(1);
           }
+        }
+
+        // Warn when both auth methods exist and using API key
+        if (
+          authMethod.type === 'api-key' &&
+          authMethod.hasBoth &&
+          !options.preferSession
+        ) {
+          console.warn(
+            '\n⚠️  Warning: Both ANTHROPIC_API_KEY and Claude session found.',
+          );
+          console.warn('   Using API key (may incur charges).');
+          console.warn(
+            '   Use --prefer-session to use your subscription instead.\n',
+          );
         }
 
         // Discover tests
@@ -82,6 +104,15 @@ program
 
         console.log(`\nnori-tests v1.0.0`);
         console.log(`================`);
+        console.log(
+          `Authentication: ${
+            authMethod.type === 'api-key'
+              ? 'API Key'
+              : authMethod.type === 'session'
+                ? 'Claude Session'
+                : 'None (dry-run)'
+          }`,
+        );
         console.log(`Test folder: ${folderPath}`);
         console.log(`Tests found: ${testFiles.length}`);
 
@@ -111,7 +142,7 @@ program
         const formatter = options.stream ? new StreamFormatter() : null;
 
         const report = await runTests(folderPath, {
-          apiKey: apiKey || '',
+          authMethod,
           outputFile: options.output,
           keepContainers: options.keepContainers,
           dryRun: options.dryRun,
