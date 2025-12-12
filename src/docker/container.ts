@@ -1,8 +1,6 @@
 import Docker from 'dockerode';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as tar from 'tar-stream';
 import type { StreamChunk } from '../types.js';
 
 // Get the GID of the Docker socket for proper permissions
@@ -13,31 +11,6 @@ function getDockerSocketGid(): number {
   } catch {
     return 1000; // Fallback to default
   }
-}
-
-// Copy a file into a container using tar stream
-async function copyFileToContainer(
-  container: Docker.Container,
-  hostFilePath: string,
-  containerPath: string,
-): Promise<void> {
-  const pack = tar.pack();
-  const fileContent = fs.readFileSync(hostFilePath);
-  const fileName = path.basename(containerPath);
-
-  // Add file to tar archive
-  pack.entry(
-    { name: fileName },
-    fileContent,
-    (err: Error | null | undefined) => {
-      if (err) throw err;
-      pack.finalize();
-    },
-  );
-
-  // Put archive into container at the directory path
-  const containerDir = path.dirname(containerPath);
-  await container.putArchive(pack, { path: containerDir });
 }
 
 export interface MountConfig {
@@ -77,30 +50,22 @@ export class ContainerManager {
     container: Docker.Container,
     sessionFilePath: string,
   ): Promise<void> {
-    // Create .claude directory in container first
-    const mkdirExec = await container.exec({
-      Cmd: ['mkdir', '-p', '/home/node/.claude'],
+    // Read session file content
+    const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
+
+    // Create .claude directory and write session file in one step
+    // Use sh -c to handle the full operation as user 1000
+    const writeExec = await container.exec({
+      Cmd: [
+        'sh',
+        '-c',
+        `mkdir -p /home/node/.claude && cat > /home/node/.claude/.claude.json << 'EOF'\n${sessionContent}\nEOF`,
+      ],
       AttachStdout: true,
       AttachStderr: true,
       User: '1000',
     });
-    await mkdirExec.start({ Detach: false });
-
-    // Copy session file to container
-    await copyFileToContainer(
-      container,
-      sessionFilePath,
-      '/home/node/.claude/.claude.json',
-    );
-
-    // Set proper ownership (run as root to change ownership)
-    const chownExec = await container.exec({
-      Cmd: ['chown', '1000:1000', '/home/node/.claude/.claude.json'],
-      AttachStdout: true,
-      AttachStderr: true,
-      User: '0',
-    });
-    await chownExec.start({ Detach: false });
+    await writeExec.start({ Detach: false });
   }
 
   async runCommand(
