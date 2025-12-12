@@ -2,6 +2,14 @@
 
 CLI tool for running integration tests with claude-code in isolated Docker containers.
 
+## Why nori-tests?
+
+Integration tests are notoriously hard to write. They require complex setup, managing external dependencies like containers and APIs, and typically demand rigid test frameworks with brittle code. The best integration tests verify tools exactly as users actually use them—but writing those tests manually is expensive and doesn't scale.
+
+**nori-tests takes a different approach:** describe your integration tests in plain English using markdown files, and let an LLM (via claude-code) execute them naturally in isolated Docker containers. The LLM follows your instructions, performs real operations, and verifies observable outcomes—giving you realistic end-to-end testing without the overhead of traditional test frameworks.
+
+This means you can test complex workflows and user scenarios by simply describing what should happen, rather than writing and maintaining elaborate test code.
+
 ## Installation
 
 ```bash
