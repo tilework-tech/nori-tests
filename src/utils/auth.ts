@@ -71,12 +71,10 @@ export function getAuthMethod(preferSession = false): AuthMethod {
 
 /**
  * Get authentication configuration for container execution.
- * @param preferSession If true, prefer session file over API key
+ * @param authMethod The authentication method to use
  * @returns Configuration with environment variables and session file to copy
  */
-export function getAuthConfig(preferSession = false): AuthConfig {
-  const authMethod = getAuthMethod(preferSession);
-
+export function getAuthConfig(authMethod: AuthMethod): AuthConfig {
   if (authMethod.type === 'api-key') {
     return {
       env: { ANTHROPIC_API_KEY: authMethod.apiKey },

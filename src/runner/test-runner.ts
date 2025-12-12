@@ -141,7 +141,7 @@ async function runSingleTest(
     ];
 
     // Get auth config from auth method
-    const authConfig = getAuthConfig(options.authMethod.type === 'session');
+    const authConfig = getAuthConfig(options.authMethod);
 
     const containerOptions = {
       workDir,

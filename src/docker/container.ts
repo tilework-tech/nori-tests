@@ -70,6 +70,39 @@ export class ContainerManager {
     this.docker = new Docker({ socketPath });
   }
 
+  /**
+   * Copy session file to container and set proper permissions
+   */
+  private async copySessionFileToContainer(
+    container: Docker.Container,
+    sessionFilePath: string,
+  ): Promise<void> {
+    // Create .claude directory in container first
+    const mkdirExec = await container.exec({
+      Cmd: ['mkdir', '-p', '/home/node/.claude'],
+      AttachStdout: true,
+      AttachStderr: true,
+      User: '1000',
+    });
+    await mkdirExec.start({ Detach: false });
+
+    // Copy session file to container
+    await copyFileToContainer(
+      container,
+      sessionFilePath,
+      '/home/node/.claude/.claude.json',
+    );
+
+    // Set proper ownership (run as root to change ownership)
+    const chownExec = await container.exec({
+      Cmd: ['chown', '1000:1000', '/home/node/.claude/.claude.json'],
+      AttachStdout: true,
+      AttachStderr: true,
+      User: '0',
+    });
+    await chownExec.start({ Detach: false });
+  }
+
   async runCommand(
     image: string,
     command: string[],
@@ -117,20 +150,9 @@ export class ContainerManager {
 
     // Copy session file if provided
     if (options.sessionFileToCopy) {
-      // Create .claude directory in container first
-      const execCreate = await container.exec({
-        Cmd: ['mkdir', '-p', '/home/node/.claude'],
-        AttachStdout: true,
-        AttachStderr: true,
-        User: '1000',
-      });
-      await execCreate.start({ Detach: false });
-
-      // Copy session file to container
-      await copyFileToContainer(
+      await this.copySessionFileToContainer(
         container,
         options.sessionFileToCopy,
-        '/home/node/.claude/.claude.json',
       );
     }
 
@@ -226,20 +248,9 @@ export class ContainerManager {
 
     // Copy session file if provided
     if (options.sessionFileToCopy) {
-      // Create .claude directory in container first
-      const execCreate = await container.exec({
-        Cmd: ['mkdir', '-p', '/home/node/.claude'],
-        AttachStdout: true,
-        AttachStderr: true,
-        User: '1000',
-      });
-      await execCreate.start({ Detach: false });
-
-      // Copy session file to container
-      await copyFileToContainer(
+      await this.copySessionFileToContainer(
         container,
         options.sessionFileToCopy,
-        '/home/node/.claude/.claude.json',
       );
     }
 

@@ -230,40 +230,43 @@ describe('getAuthConfig', () => {
   });
 
   it('should return API key config when using api-key auth', () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-test-key-12345';
+    const authMethod = {
+      type: 'api-key' as const,
+      apiKey: 'sk-test-key-12345',
+    };
 
-    const config = getAuthConfig();
+    const config = getAuthConfig(authMethod);
 
     expect(config.env.ANTHROPIC_API_KEY).toBe('sk-test-key-12345');
     expect(config.sessionFileToCopy).toBeNull();
   });
 
   it('should return session config when using session auth', () => {
-    const claudeDir = path.join(tempDir, '.claude');
-    fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
-    fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
+    const sessionFile = path.join(tempDir, '.claude', '.claude.json');
+    const authMethod = { type: 'session' as const, sessionFile };
 
-    const config = getAuthConfig();
+    const config = getAuthConfig(authMethod);
 
     expect(config.env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(config.sessionFileToCopy).toBe(sessionFile);
   });
 
   it('should throw error when no auth is available', () => {
-    expect(() => getAuthConfig()).toThrow(
+    const authMethod = { type: 'none' as const };
+    expect(() => getAuthConfig(authMethod)).toThrow(
       'No authentication method available',
     );
   });
 
-  it('should respect preferSession flag', () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-test-key-12345';
-    const claudeDir = path.join(tempDir, '.claude');
-    fs.mkdirSync(claudeDir, { recursive: true });
-    const sessionFile = path.join(claudeDir, '.claude.json');
-    fs.writeFileSync(sessionFile, JSON.stringify({ test: 'data' }));
+  it('should use session when authMethod is session', () => {
+    const sessionFile = path.join(tempDir, '.claude', '.claude.json');
+    const authMethod = {
+      type: 'session' as const,
+      sessionFile,
+      hasBoth: true,
+    };
 
-    const config = getAuthConfig(true);
+    const config = getAuthConfig(authMethod);
 
     expect(config.sessionFileToCopy).toBe(sessionFile);
     expect(config.env.ANTHROPIC_API_KEY).toBeUndefined();
