@@ -23,6 +23,8 @@ describe('ContainerManager', () => {
 
   beforeAll(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nori-container-test-'));
+    // Make temp dir world-readable so Docker containers can access it
+    fs.chmodSync(tempDir, 0o755);
   });
 
   afterAll(() => {
@@ -61,7 +63,7 @@ describe('ContainerManager', () => {
   it('mounts volumes correctly', async () => {
     const testContent = 'test-content-' + Date.now();
     const testFile = path.join(tempDir, 'mounted-file.txt');
-    fs.writeFileSync(testFile, testContent);
+    fs.writeFileSync(testFile, testContent, { mode: 0o644 });
 
     const manager = new ContainerManager();
 
